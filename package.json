@@ -1,0 +1,21 @@
+{
+  "name": "cfi.sh",
+  "version": "1.0.0",
+  "description": "CLI tool for CloudFormation",
+  "main": "index.js",
+  "bin": {
+    "cfi": "./src/index.js"
+  },
+  "author": "Iman Kamyabi",
+  "license": "ISC",
+  "dependencies": {
+    "aws-sdk": "^2.380.0",
+    "chalk": "^2.4.1",
+    "commander": "^2.19.0",
+    "figures": "^2.0.0",
+    "fs-extra": "^7.0.1",
+    "inquirer": "^6.2.1",
+    "sleep": "^5.2.3",
+    "underscore": "^1.9.1"
+  }
+}

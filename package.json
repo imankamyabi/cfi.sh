@@ -6,8 +6,8 @@
   "bin": {
     "cfi": "./src/index.js"
   },
-  "author": "Iman Kamyabi",
-  "license": "ISC",
+  "author": "Iman Kamyabi <iman@dash0.com> (https://dash0.com)",
+  "license": "GPL-3.0-or-later",
   "dependencies": {
     "aws-sdk": "^2.380.0",
     "chalk": "^2.4.1",
@@ -17,5 +17,21 @@
     "inquirer": "^6.2.1",
     "sleep": "^5.2.3",
     "underscore": "^1.9.1"
-  }
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dash0cloud/cfi.sh.git"
+  },
+  "keywords": [
+    "cloudformation",
+    "cli"
+  ],
+  "bugs": {
+    "url": "https://github.com/dash0cloud/cfi.sh/issues"
+  },
+  "homepage": "https://cfi.sh"
 }

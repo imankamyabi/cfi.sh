@@ -14,7 +14,6 @@ program
     .option('-p, --path <path>', 'Path to the template file')
     .option('-r, --region <region>', 'Region name')
     .action((options) => {
-        console.log('here 1')
         DeployHandler.execute(options);
     });
 

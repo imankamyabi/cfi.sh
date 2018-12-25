@@ -41,6 +41,10 @@ module.exports.execute = (options) => {
                         width: 20,
                         total: totalNum
                     });
+                    bar.tick(0, {
+                        'completedNum': 'Completed: ' + 0,
+                        'inProgressNum': 'In Progress: ' + 0
+                    });
                     return getStackEvents(stackEvents, options.name, printedStatus, templateObj, bar);
                 });
             })
@@ -94,6 +98,11 @@ const printNewEvents = function(updatedStackEvents, printedStatus, bar) {
             if (item.ResourceStatus === 'CREATE_IN_PROGRESS') {
                 if(!inProgressResources.includes(item.LogicalResourceId)) {
                     inProgressResources.push(item.LogicalResourceId);
+                    clearLine();
+                    bar.tick(0, {
+                        'completedNum': 'Completed: ' + doneResources.length,
+                        'inProgressNum': 'In Progress: ' + inProgressResources.length
+                    });
                 }
             } else if (item.ResourceStatus === 'CREATE_COMPLETE') {
                 doneResources.push(item.LogicalResourceId);
@@ -102,7 +111,7 @@ const printNewEvents = function(updatedStackEvents, printedStatus, bar) {
                 })
                 clearLine();
                 console.log(chalk.white(normalizeLength(formatTime(isoDateToLocalDate(item.Timestamp, offset)), 15))  + chalk.cyan(normalizeLength(item.LogicalResourceId, 20)) + chalk.magenta(normalizeLength(item.ResourceType, 25)) + chalk.green(figures.tick));
-                bar.tick({
+                bar.tick(1, {
                     'completedNum': 'Completed: ' + doneResources.length,
                     'inProgressNum': 'In Progress: ' + inProgressResources.length
                 });

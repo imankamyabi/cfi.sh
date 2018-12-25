@@ -4,7 +4,7 @@ const DeployHandler = require('./lib/DeployHandler');
 const program = require('commander');
 
 program
-    .version('1.6.0')
+    .version('1.7.0')
     .description('CloudFormation CLI tool');
 
 program

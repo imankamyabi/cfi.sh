@@ -6,3 +6,5 @@
 
 ### Deploy a template
 > cfi deploy --name [stack_name] --path [template_path] --region [region]
+
+Currently only supports json templates. YAML support to be added soon.

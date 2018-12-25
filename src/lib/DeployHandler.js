@@ -3,7 +3,6 @@ const fs = require('fs-extra');
 const yaml = require('js-yaml');
 const ProgressBar = require('progress');
 const _ = require('underscore');
-const sleep = require('sleep');
 const figures = require('figures');
 const AWS = require('aws-sdk');
 
@@ -27,6 +26,7 @@ module.exports.execute = (options) => {
             let templateObj;
             fs.readFile(options.path, "utf8").then((result) => {
                 templateObj = yaml.load(result);
+                console.log(JSON.stringify(templateObj));
                 totalNum = Object.keys(templateObj.Resources).length;
                 deployStartTime = Date.now();
                 return cfClient.createStack({
@@ -60,7 +60,7 @@ const getStackEvents = function(stackEvents, stackName, printedStatus, templateO
         printedStatus = printNewEvents(updatedStackEvents, printedStatus, bar);
 
         if (!isDone(updatedStackEvents, stackName)) {
-            sleep.msleep(CF_REFRESH_RATE);
+            waitTill(CF_REFRESH_RATE);
             return getStackEvents(updatedStackEvents, stackName, printedStatus, templateObj, bar)
         } else {
             clearLine();
@@ -140,4 +140,9 @@ const normalizeLength = function(input, length) {
 const clearLine = function(){
     process.stdout.clearLine();
     process.stdout.cursorTo(0);
+}
+
+const waitTill = function(ms) {
+    const waitUntill = new Date(new Date().getTime() + ms);
+    while(waitUntill > new Date()){}
 }

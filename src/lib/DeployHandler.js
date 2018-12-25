@@ -26,7 +26,6 @@ module.exports.execute = (options) => {
             let templateObj;
             fs.readFile(options.path, "utf8").then((result) => {
                 templateObj = yaml.load(result);
-                console.log(JSON.stringify(templateObj));
                 totalNum = Object.keys(templateObj.Resources).length;
                 deployStartTime = Date.now();
                 return cfClient.createStack({

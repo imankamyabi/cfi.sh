@@ -3,13 +3,13 @@ const fs = require('fs-extra');
 const yaml = require('js-yaml');
 const ProgressBar = require('progress');
 const _ = require('underscore');
-const figures = require('figures');
 const AWS = require('aws-sdk');
 
 let deployStartTime;
 let totalNum;
 let inProgressResources = [];
 let doneResources = [];
+let stackFailedComplete = false;
 const CF_REFRESH_RATE = 500;
 
 module.exports.execute = (options) => {
@@ -30,6 +30,9 @@ module.exports.execute = (options) => {
                 deployStartTime = Date.now();
                 return cfClient.createStack({
                     StackName: options.name,
+                    Capabilities: [
+                        "CAPABILITY_IAM"
+                    ],
                     TemplateBody: result
                 }).promise().then((result) => {
                     console.log('Initiated stack creation ...');
@@ -39,6 +42,7 @@ module.exports.execute = (options) => {
                         complete: '=',
                         incomplete: ' ',
                         width: 20,
+                        renderThrottle: 1,
                         total: totalNum
                     });
                     bar.tick(0, {
@@ -46,6 +50,8 @@ module.exports.execute = (options) => {
                         'inProgressNum': 'In Progress: ' + 0
                     });
                     return getStackEvents(stackEvents, options.name, printedStatus, templateObj, bar);
+                }).catch((error) => {
+                    console.log(chalk.red(error.code + ': ' + error.message));
                 });
             })
         }
@@ -62,14 +68,17 @@ const getStackEvents = function(stackEvents, stackName, printedStatus, templateO
         updatedStackEvents = _.sortBy(updatedStackEvents,"Timestamp");
         printedStatus = printNewEvents(updatedStackEvents, printedStatus, bar);
 
-        if (!isDone(updatedStackEvents, stackName)) {
+        if ((!isDone(updatedStackEvents, stackName)) && !stackFailedComplete) {
             waitTill(CF_REFRESH_RATE);
             return getStackEvents(updatedStackEvents, stackName, printedStatus, templateObj, bar)
         } else {
-            clearLine();
-            printNewEvents(updatedStackEvents, printedStatus, bar);
             const totalTime = Math.round((Date.now() - deployStartTime) / 1000);
-            console.log(chalk.green('Stack created succesfully. ') + ' (Resources: ' + totalNum  + '  Duration: ' + totalTime + ' seconds)');
+            if (stackFailedComplete) {
+                console.log(chalk.red('Stack deployment failed.'));
+            } else {
+                console.log(chalk.green('Stack created succesfully. ') + ' (Resources: ' + totalNum  + '  Duration: ' + totalTime + ' seconds)');
+            }
+            
         }
     });
 }
@@ -93,32 +102,54 @@ const isDone = function(stackEvents, stackName) {
 
 const printNewEvents = function(updatedStackEvents, printedStatus, bar) {
     var offset = 360;
-    updatedStackEvents.forEach(item => {
-        if (printedStatus && !printedStatus[item.EventId] && (item.LogicalResourceId != stackName)) {
+    let tickNum = 0;
+    let updateProgress = false;
+    const lines = []
+    updatedStackEvents.filter((item) => {
+        return (printedStatus && !printedStatus[item.EventId]);
+    }).forEach(item => {
+        if (item.LogicalResourceId != stackName) {
             if (item.ResourceStatus === 'CREATE_IN_PROGRESS') {
                 if(!inProgressResources.includes(item.LogicalResourceId)) {
                     inProgressResources.push(item.LogicalResourceId);
-                    clearLine();
-                    bar.tick(0, {
-                        'completedNum': 'Completed: ' + doneResources.length,
-                        'inProgressNum': 'In Progress: ' + inProgressResources.length
-                    });
+                    updateProgress = true;
                 }
             } else if (item.ResourceStatus === 'CREATE_COMPLETE') {
                 doneResources.push(item.LogicalResourceId);
                 inProgressResources = inProgressResources.filter((element) => {
                     return element != item.LogicalResourceId;
-                })
-                clearLine();
-                console.log(chalk.white(normalizeLength(formatTime(isoDateToLocalDate(item.Timestamp, offset)), 15))  + chalk.cyan(normalizeLength(item.LogicalResourceId, 20)) + chalk.magenta(normalizeLength(item.ResourceType, 25)) + chalk.green(figures.tick));
-                bar.tick(1, {
-                    'completedNum': 'Completed: ' + doneResources.length,
-                    'inProgressNum': 'In Progress: ' + inProgressResources.length
                 });
+                tickNum = tickNum + 1;
+                updateProgress = true;
+                lines.push(chalk.white(normalizeLength(formatTime(isoDateToLocalDate(item.Timestamp, offset)), 15))  + chalk.cyan(normalizeLength(item.LogicalResourceId, 25)) + chalk.magenta(normalizeLength(item.ResourceType, 30)) + chalk.green(normalizeLength(item.ResourceStatus, 20)));
+            } else if ((item.ResourceStatus === 'CREATE_FAILED')) {
+                lines.push(chalk.white(normalizeLength(formatTime(isoDateToLocalDate(item.Timestamp, offset)), 15))  + chalk.cyan(normalizeLength(item.LogicalResourceId, 25)) + chalk.magenta(normalizeLength(item.ResourceType, 30)) + chalk.red(normalizeLength(item.ResourceStatus, 20)));
+                lines.push(item.ResourceStatusReason);
             }
-            printedStatus[item.EventId] = true;
+        } else if ((item.LogicalResourceId == stackName)) {
+            if (item.ResourceStatus === 'CREATE_COMPLETE') {
+                stackDeployComplete = true;
+            } else if ((item.ResourceStatus === 'ROLLBACK_IN_PROGRESS') || (item.ResourceStatus === 'ROLLBACK_COMPLETE')) {
+                lines.push(chalk.white(normalizeLength(formatTime(isoDateToLocalDate(item.Timestamp, offset)), 15))  + chalk.cyan(normalizeLength(item.LogicalResourceId, 25)) + chalk.magenta(normalizeLength(item.ResourceType, 30)) + chalk.red(normalizeLength(item.ResourceStatus, 20)));
+                if (item.ResourceStatusReason) {
+                    lines.push(item.ResourceStatusReason);
+                }
+                if (item.ResourceStatus === 'ROLLBACK_COMPLETE') {
+                    stackFailedComplete = true;
+                }
+            }
         }
+        printedStatus[item.EventId] = true;
     });
+    if (lines.length > 0) {
+        bar.interrupt(lines.join('\n'));
+    }
+    if (updateProgress) {
+        bar.tick(tickNum, {
+            'completedNum': 'Completed: ' + doneResources.length,
+            'inProgressNum': 'In Progress: ' + inProgressResources.length
+        });
+    }
     return printedStatus;
 }
 
@@ -143,11 +174,6 @@ const normalizeLength = function(input, length) {
         }
     }
     return input;
-}
-
-const clearLine = function(){
-    process.stdout.clearLine();
-    process.stdout.cursorTo(0);
 }
 
 const waitTill = function(ms) {

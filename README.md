@@ -8,6 +8,5 @@
 > cfi deploy --name [stack_name] --path [template_path] --region [region]
 
 ### Notes:
-This CLI tool uses default local AWS credentials for authentication to AWS. (Stored at ~/.aws by default).
-Currently only supports json templates. YAML support to be added soon.
+
 Currently only supports deploying new stacks. Update to be added soon.

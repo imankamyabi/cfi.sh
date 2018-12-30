@@ -1,11 +1,13 @@
 const chalk = require('chalk');
 const fs = require('fs-extra');
 const yaml = require('js-yaml');
+const { schema } = require('yaml-cfn');
 const ProgressBar = require('progress');
 const _ = require('underscore');
 const AWS = require('aws-sdk');
 
 let deployStartTime;
+let templateObj;
 let totalNum;
 let inProgressResources = [];
 let doneResources = [];
@@ -23,10 +25,10 @@ module.exports.execute = (options) => {
         // TO BE IMPLEMENTED.
     }).catch((error) => {
         if (error.statusCode == 400) {
-            let templateObj;
             fs.readFile(options.path, "utf8").then((result) => {
-                templateObj = yaml.load(result);
-                totalNum = Object.keys(templateObj.Resources).length;
+                const pathParam = options.path;
+                const templateExtension = pathParam.split('.').slice(-1)[0].toLowerCase();
+                parseTemplate(templateExtension, result);
                 deployStartTime = Date.now();
                 return cfClient.createStack({
                     StackName: options.name,
@@ -49,7 +51,7 @@ module.exports.execute = (options) => {
                         'completedNum': 'Completed: ' + 0,
                         'inProgressNum': 'In Progress: ' + 0
                     });
-                    return getStackEvents(stackEvents, options.name, printedStatus, templateObj, bar);
+                    return getStackEvents(stackEvents, options.name, printedStatus, bar);
                 }).catch((error) => {
                     console.log(chalk.red(error.code + ': ' + error.message));
                 });
@@ -58,9 +60,8 @@ module.exports.execute = (options) => {
     });
 }
 
-const getStackEvents = function(stackEvents, stackName, printedStatus, templateObj, bar) {
+const getStackEvents = function(stackEvents, stackName, printedStatus, bar) {
     const cfClient = new AWS.CloudFormation({apiVersion: '2010-05-15'});
-    totalNum = Object.keys(templateObj.Resources).length;
     return cfClient.describeStackEvents({
         StackName: stackName
     }).promise().then((result) => {
@@ -70,7 +71,7 @@ const getStackEvents = function(stackEvents, stackName, printedStatus, templateO
 
         if ((!isDone(updatedStackEvents, stackName)) && !stackFailedComplete) {
             waitTill(CF_REFRESH_RATE);
-            return getStackEvents(updatedStackEvents, stackName, printedStatus, templateObj, bar)
+            return getStackEvents(updatedStackEvents, stackName, printedStatus, bar)
         } else {
             const totalTime = Math.round((Date.now() - deployStartTime) / 1000);
             if (stackFailedComplete) {
@@ -179,4 +180,15 @@ const normalizeLength = function(input, length) {
 const waitTill = function(ms) {
     const waitUntill = new Date(new Date().getTime() + ms);
     while(waitUntill > new Date()){}
+}
+
+const parseTemplate = function(formatType, content) {
+    
+    if (formatType == 'json') {
+        templateObj = JSON.parse(content);
+        return Object.keys(JSON.parse(content).Resources).length;
+    } else if((formatType == 'yaml') || (formatType == 'yml')) {
+        templateObj = yaml.safeLoad(content, { schema: schema });
+    }
+    totalNum = Object.keys(templateObj.Resources).length;
 }
